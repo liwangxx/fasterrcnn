@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from typing import Dict, Any, List, Tuple, Optional, Union, Callable
 
-from ..base_visualizer import BaseVisualizer
+from ..visualization.base_visualizer import BaseVisualizer
 
 class BaseHook:
     """可视化钩子基类"""

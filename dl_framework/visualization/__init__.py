@@ -1,10 +1,9 @@
 from .base_visualizer import BaseVisualizer
+from .registry import VisualizerRegistry
 from .tensorboard import TensorBoardVisualizer
-from .hooks import BaseHook, GradientFlowHook
 
 __all__ = [
     'BaseVisualizer',
+    'VisualizerRegistry',
     'TensorBoardVisualizer',
-    'BaseHook',
-    'GradientFlowHook',
 ]

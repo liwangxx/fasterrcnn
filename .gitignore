@@ -18,3 +18,5 @@ data/
 models/
 # 日志
 logs/
+# 可视化
+visualization/

@@ -10,7 +10,9 @@ from ..datasets.registry import DatasetRegistry
 from ..utils.logger import Logger
 from ..utils.checkpoint import save_checkpoint, load_checkpoint
 from ..visualization.base_visualizer import BaseVisualizer
-from ..visualization.hooks.base_hook import BaseHook
+from ..hooks.base_hook import BaseHook
+from ..hooks.registry import HookRegistry
+from ..visualization.registry import VisualizerRegistry
 
 class BaseTrainer:
     """基础训练器类"""
@@ -226,7 +228,36 @@ class BaseTrainer:
         Returns:
             可视化器
         """
-        # 子类可以实现此方法来提供特定的可视化器
+        # 检查配置中是否有visualization部分
+        vis_config = self.config.get('visualization')
+        if not vis_config:
+            return None
+            
+        # 检查配置中是否指定了可视化器类型
+        visualizer_type = None
+        for key in vis_config.keys():
+            if key in VisualizerRegistry.list():
+                visualizer_type = key
+                break
+            
+        # 如果找不到指定的可视化器类型，尝试查找默认类型
+        if not visualizer_type:
+            if 'tensorboard' in vis_config:
+                visualizer_type = 'TensorBoard'
+            else:
+                self.logger.warning("未找到支持的可视化器类型")
+                return None
+                
+        try:
+            visualizer_class = VisualizerRegistry.get(visualizer_type)
+            visualizer = visualizer_class(vis_config)
+            self.logger.info(f"使用可视化器: {visualizer_type}")
+            return visualizer
+        except KeyError:
+            self.logger.warning(f"未知的可视化器类型: {visualizer_type}")
+        except Exception as e:
+            self.logger.error(f"创建可视化器 {visualizer_type} 时出错: {e}")
+            
         return None
     
     def _build_hooks(self) -> List[BaseHook]:
@@ -235,8 +266,33 @@ class BaseTrainer:
         Returns:
             钩子列表
         """
-        # 子类可以实现此方法来提供特定的钩子
-        return []
+        hooks = []
+        
+        # 检查可视化配置中是否有钩子配置
+        vis_config = self.config.get('visualization', {})
+        hooks_config = vis_config.get('hooks', [])
+        
+        if not hooks_config or not self.visualizer:
+            return hooks
+            
+        # 创建钩子实例
+        for hook_config in hooks_config:
+            hook_type = hook_config.get('type')
+            if not hook_type:
+                self.logger.warning(f"跳过未指定类型的钩子: {hook_config}")
+                continue
+                
+            try:
+                hook_class = HookRegistry.get(hook_type)
+                hook = hook_class(hook_config, self.visualizer)
+                hooks.append(hook)
+                self.logger.info(f"添加钩子: {hook_type} 目标: {hook_config.get('targets', [])}")
+            except KeyError:
+                self.logger.warning(f"未知的钩子类型: {hook_type}")
+            except Exception as e:
+                self.logger.error(f"创建钩子 {hook_type} 时出错: {e}")
+        
+        return hooks
     
     def train(self) -> nn.Module:
         """训练模型
@@ -300,6 +356,11 @@ class BaseTrainer:
             hook.after_training(self.model, val_metrics)
             hook.cleanup()
         
+        # 关闭可视化器
+        if self.visualizer is not None:
+            self.visualizer.flush()
+            self.visualizer.close()
+        
         # 加载最佳模型
         best_checkpoint_path = os.path.join(self.output_dir, 'model_best.pth')
         if os.path.exists(best_checkpoint_path):
@@ -352,6 +413,10 @@ class BaseTrainer:
             # 累积损失
             total_loss += loss.item()
             
+            # 使用可视化器记录每个batch的损失
+            if self.visualizer is not None:
+                self.visualizer.add_scalar('train/batch_loss', loss.item(), self.global_step)
+            
             # 执行钩子的step后方法
             for hook in self.hooks:
                 hook.after_step(self.global_step, batch, outputs, loss, self.model)
@@ -367,6 +432,10 @@ class BaseTrainer:
         
         # 计算平均损失
         avg_loss = total_loss / num_batches
+        
+        # 使用可视化器记录每个epoch的平均损失
+        if self.visualizer is not None:
+            self.visualizer.add_scalar('train/epoch_loss', avg_loss, self.current_epoch)
         
         return {'loss': avg_loss}
     
@@ -408,6 +477,14 @@ class BaseTrainer:
         
         # 计算其他指标（子类可以重写此方法添加更多指标）
         metrics = {'loss': avg_loss}
+        
+        # 使用可视化器记录验证指标
+        if self.visualizer is not None:
+            self.visualizer.add_scalar('val/loss', avg_loss, self.current_epoch)
+            # 如果有其他指标，也记录它们
+            for key, value in metrics.items():
+                if key != 'loss':  # loss已经记录过了
+                    self.visualizer.add_scalar(f'val/{key}', value, self.current_epoch)
         
         return metrics
     

@@ -6,8 +6,10 @@ import torch.nn as nn
 from typing import Dict, Any, List, Tuple
 
 from .base_hook import BaseHook
-from ..base_visualizer import BaseVisualizer
+from .registry import HookRegistry
+from ..visualization.base_visualizer import BaseVisualizer
 
+@HookRegistry.register("GradientFlowHook")
 class GradientFlowHook(BaseHook):
     """梯度流可视化钩子，用于可视化模型参数梯度的变化"""
     

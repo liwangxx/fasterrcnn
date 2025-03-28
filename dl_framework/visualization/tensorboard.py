@@ -6,7 +6,9 @@ from typing import Dict, Any, List, Union, Optional
 from torch.utils.tensorboard import SummaryWriter
 
 from .base_visualizer import BaseVisualizer
+from .registry import VisualizerRegistry
 
+@VisualizerRegistry.register("TensorBoard")
 class TensorBoardVisualizer(BaseVisualizer):
     """TensorBoard可视化器"""
     
