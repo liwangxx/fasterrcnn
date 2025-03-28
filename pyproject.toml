@@ -1,0 +1,30 @@
+[project]
+name = "dl-template"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "torch",
+    "torchvision",
+    "torchaudio",
+    "pyyaml>=6.0.2",
+    "tensorboard>=2.19.0",
+    "matplotlib>=3.10.1",
+]
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu118"},
+]
+torchvision = [
+  { index = "pytorch-cu118"},
+]
+torchaudio = [
+  { index = "pytorch-cu118"},
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
+explicit = true
+

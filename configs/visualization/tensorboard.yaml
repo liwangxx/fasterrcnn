@@ -1,0 +1,10 @@
+tensorboard:
+  enabled: true
+  log_dir: "logs/tensorboard"
+  flush_secs: 30
+
+hooks:
+  - name: "grad_flow"
+    type: "GradientFlowHook"
+    frequency: 100
+    targets: ["conv1", "conv2", "conv3", "fc1", "fc2"] 
