@@ -3,8 +3,6 @@ dataset_config: "configs/datasets/cifar10.yaml"
 
 seed: 42
 device: "cuda"
-output_dir: "checkpoints/default"
-log_dir: "logs/default"
 
 training:
   epochs: 50

@@ -24,7 +24,7 @@ class GradientFlowHook(BaseHook):
     
     def _setup(self) -> None:
         """设置钩子环境"""
-        self.save_dir = self.config.get('save_dir', 'visualization/grad_flow')
+        self.save_dir = os.path.join(self.vis_dir, 'grad_flow')
         os.makedirs(self.save_dir, exist_ok=True)
         
         # 存储梯度数据
@@ -128,9 +128,6 @@ class GradientFlowHook(BaseHook):
             # 设置布局
             plt.tight_layout()
             
-            # 保存图表
-            fig_path = os.path.join(self.save_dir, f"grad_flow_{step}.png")
-            plt.savefig(fig_path)
             
             # 添加到可视化器
             self.visualizer.add_figure('grad_flow', fig, step)

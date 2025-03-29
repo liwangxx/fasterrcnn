@@ -13,22 +13,30 @@ class BaseVisualizer:
         Args:
             config: 可视化配置
         """
-        self.config = config
-        self.enabled = config.get('enabled', True)
+        self.global_config = config
+        self.config = config.get('visualization', {})
+        self.experiment_dir = config.get('experiment_dir', 'experiments/default')
+        # 查找是否有已经注册了的可视化器
+        from .registry import VisualizerRegistry
+        for key in self.config.keys():
+            if key.lower() in [name.lower() for name in VisualizerRegistry.list().keys()]:
+                self.visualizer_config = self.config.get(key, None)
         
-        if self.enabled:
-            self.log_dir = self._get_log_dir()
-    
-    def _get_log_dir(self) -> str:
-        """获取日志目录
-        
-        Returns:
-            日志目录路径
-        """
-        log_dir = self.config.get('log_dir', 'logs/visualization')
-        os.makedirs(log_dir, exist_ok=True)
-        return log_dir
-    
+        if self.visualizer_config:
+            self.vis_dir = self.global_config.get('visualization_dir')
+            
+            # 确保日志目录存在
+            os.makedirs(self.vis_dir, exist_ok=True)
+            
+            # 创建标准子目录
+            self.img_dir = os.path.join(self.vis_dir, 'images')
+            self.sample_dir = os.path.join(self.vis_dir, 'samples')
+            
+            # 确保子目录存在
+            os.makedirs(self.img_dir, exist_ok=True)
+            os.makedirs(self.sample_dir, exist_ok=True)
+
+
     def add_scalar(self, tag: str, scalar_value: float, global_step: int) -> None:
         """添加标量
         
@@ -37,7 +45,7 @@ class BaseVisualizer:
             scalar_value: 标量值
             global_step: 全局步数
         """
-        if not self.enabled:
+        if not self.visualizer_config:
             return
         self._add_scalar_impl(tag, scalar_value, global_step)
     
@@ -60,7 +68,7 @@ class BaseVisualizer:
             tag_scalar_dict: 标签-标量字典
             global_step: 全局步数
         """
-        if not self.enabled:
+        if not self.visualizer_config:
             return
         self._add_scalars_impl(main_tag, tag_scalar_dict, global_step)
     
@@ -83,7 +91,7 @@ class BaseVisualizer:
             img_tensor: 图像张量，形状为[C, H, W]或[N, C, H, W]
             global_step: 全局步数
         """
-        if not self.enabled:
+        if not self.visualizer_config:
             return
         self._add_image_impl(tag, img_tensor, global_step)
     
@@ -106,7 +114,7 @@ class BaseVisualizer:
             values: 数值
             global_step: 全局步数
         """
-        if not self.enabled:
+        if not self.visualizer_config:
             return
         self._add_histogram_impl(tag, values, global_step)
     
@@ -129,7 +137,7 @@ class BaseVisualizer:
             figure: matplotlib图表
             global_step: 全局步数
         """
-        if not self.enabled:
+        if not self.visualizer_config:
             return
         self._add_figure_impl(tag, figure, global_step)
     
@@ -152,7 +160,7 @@ class BaseVisualizer:
             text_string: 文本内容
             global_step: 全局步数
         """
-        if not self.enabled:
+        if not self.visualizer_config:
             return
         self._add_text_impl(tag, text_string, global_step)
     
@@ -174,7 +182,7 @@ class BaseVisualizer:
             model: 模型
             input_to_model: 输入张量
         """
-        if not self.enabled:
+        if not self.visualizer_config:
             return
         self._add_graph_impl(model, input_to_model)
     
@@ -190,7 +198,7 @@ class BaseVisualizer:
     
     def flush(self) -> None:
         """刷新可视化器"""
-        if not self.enabled:
+        if not self.visualizer_config:
             return
         self._flush_impl()
     
@@ -201,7 +209,7 @@ class BaseVisualizer:
     
     def close(self) -> None:
         """关闭可视化器"""
-        if not self.enabled:
+        if not self.visualizer_config:
             return
         self._close_impl()
     

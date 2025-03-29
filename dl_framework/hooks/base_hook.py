@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 from typing import Dict, Any, List, Tuple, Optional, Union, Callable
@@ -7,18 +8,24 @@ from ..visualization.base_visualizer import BaseVisualizer
 class BaseHook:
     """可视化钩子基类"""
     
-    def __init__(self, config: Dict[str, Any], visualizer: BaseVisualizer):
+    def __init__(self, global_config: Dict[str, Any], visualizer: BaseVisualizer):
         """初始化
         
         Args:
-            config: 钩子配置
+            global_config: 全局配置
             visualizer: 可视化器
         """
-        self.config = config
+        self.config = global_config.get('visualization', {}).get('hooks', {})
+        self.experiment_dir = global_config.get('experiment_dir', 'experiments/default')
+        self.vis_dir = global_config.get('visualization_dir', os.path.join(self.experiment_dir, 'visualization'))
         self.visualizer = visualizer
-        self.name = config.get('name', self.__class__.__name__)
-        self.frequency = config.get('frequency', 100)  # 多少步触发一次
-        self.targets = config.get('targets', [])  # 目标模块
+        # 根据配置初始化钩子
+        for hook_config in self.config:
+            if self.__class__.__name__ == hook_config.get('type', None):
+                self.name = hook_config.get('name', self.__class__.__name__)
+                self.frequency = hook_config.get('frequency', 100)  # 多少步触发一次
+                self.targets = hook_config.get('targets', [])  # 目标模块
+                break
         
         # 存储注册的钩子句柄
         self.hooks = {}

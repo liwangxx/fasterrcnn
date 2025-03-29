@@ -10,13 +10,7 @@ wheels/
 .venv
 .vscode/
 
-# 权重
-checkpoints/
+# 实验结果
+experiments/
 # 数据集
 data/
-# 模型
-models/
-# 日志
-logs/
-# 可视化
-visualization/

@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from .base_visualizer import BaseVisualizer
 from .registry import VisualizerRegistry
 
-@VisualizerRegistry.register("TensorBoard")
+@VisualizerRegistry.register("tensorboard")
 class TensorBoardVisualizer(BaseVisualizer):
     """TensorBoard可视化器"""
     
@@ -20,16 +20,19 @@ class TensorBoardVisualizer(BaseVisualizer):
         """
         super().__init__(config)
         
-        if self.enabled:
-            tensorboard_config = config.get('tensorboard', {})
-            self.log_dir = tensorboard_config.get('log_dir', self.log_dir)
-            self.flush_secs = tensorboard_config.get('flush_secs', 30)
+        if self.visualizer_config:
+            # 不允许自定义log_dir，使用统一的实验目录结构
+            self.flush_secs = self.visualizer_config.get('flush_secs', 30)
             
             # 创建SummaryWriter
             self.writer = SummaryWriter(
-                log_dir=self.log_dir,
+                log_dir=self.vis_dir,
                 flush_secs=self.flush_secs
             )
+            
+            # 保存样本图像的目录
+            self.sample_dir = os.path.join(self.vis_dir, 'samples')
+            os.makedirs(self.sample_dir, exist_ok=True)
     
     def _add_scalar_impl(self, tag: str, scalar_value: float, global_step: int) -> None:
         """添加标量的具体实现
@@ -80,6 +83,11 @@ class TensorBoardVisualizer(BaseVisualizer):
             global_step: 全局步数
         """
         self.writer.add_figure(tag, figure, global_step)
+        
+        # 可选地保存图像到文件
+        if self.visualizer_config.get('save_figures', False):
+            fig_path = os.path.join(self.sample_dir, f"{tag}_{global_step}.png")
+            figure.savefig(fig_path)
     
     def _add_text_impl(self, tag: str, text_string: str, global_step: int) -> None:
         """添加文本的具体实现

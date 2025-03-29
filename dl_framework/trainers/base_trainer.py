@@ -7,7 +7,8 @@ from typing import Dict, Any, List, Tuple, Callable, Optional, Union
 
 from ..models.registry import ModelRegistry
 from ..datasets.registry import DatasetRegistry
-from ..utils.logger import Logger
+from ..utils.logger import get_logger
+import logging
 from ..utils.checkpoint import save_checkpoint, load_checkpoint
 from ..visualization.base_visualizer import BaseVisualizer
 from ..hooks.base_hook import BaseHook
@@ -24,6 +25,21 @@ class BaseTrainer:
             config: 训练配置
         """
         self.config = config
+        
+        # 实验目录设置 - 所有输出都统一放在这个目录下
+        self.experiment_dir = config.get('experiment_dir', 'experiments/default')
+        
+        # 设置标准子目录
+        self.checkpoints_dir = config.get('checkpoints_dir', os.path.join(self.experiment_dir, 'checkpoints'))
+        self.logs_dir = config.get('logs_dir', os.path.join(self.experiment_dir, 'logs'))
+        self.visualization_dir = config.get('visualization_dir', os.path.join(self.experiment_dir, 'visualization'))
+        
+        # 确保所有目录存在
+        os.makedirs(self.experiment_dir, exist_ok=True)
+        os.makedirs(self.checkpoints_dir, exist_ok=True)
+        os.makedirs(self.logs_dir, exist_ok=True)
+        os.makedirs(self.visualization_dir, exist_ok=True)
+        
         self.logger = self._build_logger()
         self.device = self._get_device()
         
@@ -47,10 +63,6 @@ class BaseTrainer:
         self.global_step = 0
         self.best_metric = float('inf')  # 用于模型检查点保存
         
-        # 输出目录
-        self.output_dir = config.get('output_dir', 'checkpoints')
-        os.makedirs(self.output_dir, exist_ok=True)
-        
         # 加载检查点（如果指定）
         resume_path = config.get('resume')
         if resume_path and os.path.exists(resume_path):
@@ -66,15 +78,13 @@ class BaseTrainer:
             self.logger.info(f"从检查点恢复训练: {resume_path}")
             self.logger.info(f"从epoch {self.current_epoch} 继续训练")
     
-    def _build_logger(self) -> Logger:
+    def _build_logger(self) -> logging.Logger:
         """构建日志记录器
         
         Returns:
             日志记录器
         """
-        log_dir = self.config.get('log_dir', 'logs')
-        os.makedirs(log_dir, exist_ok=True)
-        return Logger(log_dir)
+        return get_logger(self.__class__.__module__ + '.' + self.__class__.__name__)
     
     def _get_device(self) -> torch.device:
         """获取设备
@@ -235,22 +245,35 @@ class BaseTrainer:
             
         # 检查配置中是否指定了可视化器类型
         visualizer_type = None
+        registry_keys = VisualizerRegistry.list().keys()
+        registry_keys_lower = [key.lower() for key in registry_keys]
+        
         for key in vis_config.keys():
-            if key in VisualizerRegistry.list():
-                visualizer_type = key
+            # 大小写不敏感的匹配
+            if key.lower() in registry_keys_lower:
+                # 找到对应的原始键名
+                index = registry_keys_lower.index(key.lower())
+                visualizer_type = list(registry_keys)[index]
                 break
             
         # 如果找不到指定的可视化器类型，尝试查找默认类型
         if not visualizer_type:
             if 'tensorboard' in vis_config:
-                visualizer_type = 'TensorBoard'
+                # 查找大小写不敏感的tensorboard可视化器
+                for key in registry_keys:
+                    if key.lower() == 'tensorboard':
+                        visualizer_type = key
+                        break
+                # 如果找不到，尝试使用默认名称
+                if not visualizer_type:
+                    visualizer_type = 'tensorboard'
             else:
                 self.logger.warning("未找到支持的可视化器类型")
                 return None
                 
         try:
             visualizer_class = VisualizerRegistry.get(visualizer_type)
-            visualizer = visualizer_class(vis_config)
+            visualizer = visualizer_class(self.config)
             self.logger.info(f"使用可视化器: {visualizer_type}")
             return visualizer
         except KeyError:
@@ -284,7 +307,7 @@ class BaseTrainer:
                 
             try:
                 hook_class = HookRegistry.get(hook_type)
-                hook = hook_class(hook_config, self.visualizer)
+                hook = hook_class(self.config, self.visualizer)
                 hooks.append(hook)
                 self.logger.info(f"添加钩子: {hook_type} 目标: {hook_config.get('targets', [])}")
             except KeyError:
@@ -362,7 +385,7 @@ class BaseTrainer:
             self.visualizer.close()
         
         # 加载最佳模型
-        best_checkpoint_path = os.path.join(self.output_dir, 'model_best.pth')
+        best_checkpoint_path = os.path.join(self.checkpoints_dir, 'model_best.pth')
         if os.path.exists(best_checkpoint_path):
             load_checkpoint(self.model, best_checkpoint_path, self.device)
         
@@ -492,33 +515,45 @@ class BaseTrainer:
         """保存检查点
         
         Args:
-            metrics: 验证指标
+            metrics: 性能指标
         """
-        # 保存最新模型
-        latest_path = os.path.join(self.output_dir, 'model_latest.pth')
+        # 当前模型检查点路径
+        latest_checkpoint_path = os.path.join(self.checkpoints_dir, 'model_latest.pth')
+        
+        # 保存最新的检查点
         save_checkpoint(
-            self.model, 
-            latest_path, 
+            self.model,
+            latest_checkpoint_path,
             optimizer=self.optimizer,
             scheduler=self.scheduler,
             epoch=self.current_epoch,
             metrics=metrics
         )
         
-        # 保存最佳模型（以验证损失为标准）
-        current_metric = metrics.get('loss', float('inf'))
-        if current_metric < self.best_metric:
-            self.best_metric = current_metric
-            best_path = os.path.join(self.output_dir, 'model_best.pth')
+        # 判断是否需要保存最佳模型
+        if self._is_best_checkpoint(metrics):
+            best_checkpoint_path = os.path.join(self.checkpoints_dir, 'model_best.pth')
             save_checkpoint(
-                self.model, 
-                best_path, 
+                self.model,
+                best_checkpoint_path,
                 optimizer=self.optimizer,
                 scheduler=self.scheduler,
                 epoch=self.current_epoch,
                 metrics=metrics
             )
-            self.logger.info(f"保存最佳模型，指标: {current_metric:.4f}")
+            self.best_metric = metrics['loss']
+            self.logger.info(f"保存最佳模型，验证损失: {metrics['loss']:.4f}")
+    
+    def _is_best_checkpoint(self, metrics: Dict[str, float]) -> bool:
+        """判断是否需要保存最佳模型
+        
+        Args:
+            metrics: 验证指标
+            
+        Returns:
+            是否需要保存最佳模型
+        """
+        return metrics['loss'] < self.best_metric
     
     def _should_stop_early(self, metrics: Dict[str, float]) -> bool:
         """检查是否应该早停

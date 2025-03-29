@@ -11,7 +11,7 @@ from typing import Dict, Any
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from dl_framework.utils.config import load_config, save_config, merge_configs
-from dl_framework.utils.logger import Logger
+from dl_framework.utils.logger import configure_logging, get_logger
 from dl_framework.trainers.base_trainer import BaseTrainer
 
 def parse_args():
@@ -55,25 +55,26 @@ def main():
     else:
         experiment_name = f"experiment_{timestamp}"
     
-    # 设置输出目录和日志目录
-    output_dir = os.path.join('checkpoints', experiment_name)
-    log_dir = os.path.join('logs', experiment_name)
-    
-    config['output_dir'] = output_dir
-    config['log_dir'] = log_dir
+    # 设置实验根目录
+    experiment_dir = os.path.join('experiments', experiment_name)
     
     # 确保目录存在
-    os.makedirs(output_dir, exist_ok=True)
-    os.makedirs(log_dir, exist_ok=True)
+    os.makedirs(experiment_dir, exist_ok=True)
+    
+    config['experiment_dir'] = experiment_dir
+    config['checkpoints_dir'] = os.path.join(experiment_dir, 'checkpoints')
+    config['logs_dir'] = os.path.join(experiment_dir, 'logs')
+    config['visualization_dir'] = os.path.join(experiment_dir, 'visualization')
+    
     
     # 保存完整配置
-    save_config(config, os.path.join(output_dir, 'config.yaml'))
+    save_config(config, os.path.join(experiment_dir, 'config.yaml'))
     
-    # 创建日志记录器
-    logger = Logger(log_dir, name=experiment_name)
-    logger.info(f"实验名称: {experiment_name}")
-    logger.info(f"配置文件: {args.config}")
-    logger.info(f"输出目录: {output_dir}")
+    # 配置全局日志系统
+    configure_logging(experiment_dir, experiment_name)
+    
+    # 获取 train 模块的日志器
+    logger = get_logger("train")
     if args.resume:
         logger.info(f"从检查点恢复训练: {args.resume}")
     

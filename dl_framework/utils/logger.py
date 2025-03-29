@@ -3,75 +3,90 @@ import os
 from typing import Optional
 import sys
 
-class Logger:
-    """日志记录器，用于记录训练过程中的信息"""
+# 全局日志器实例
+_global_logger = None
+_log_configured = False
+
+def configure_logging(log_dir: str, experiment_name: Optional[str] = None):
+    """配置全局日志系统
     
-    def __init__(self, log_dir: str, name: str = 'dl_framework'):
-        """初始化
-        
-        Args:
-            log_dir: 日志目录
-            name: 日志名称
-        """
-        self.log_dir = log_dir
-        os.makedirs(log_dir, exist_ok=True)
-        
-        # 设置日志记录器
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(logging.INFO)
-        
-        # 清除已有的处理器
-        if self.logger.handlers:
-            self.logger.handlers.clear()
-        
-        # 创建文件处理器
-        log_file = os.path.join(log_dir, f'{name}.log')
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setLevel(logging.INFO)
-        
-        # 创建控制台处理器
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.INFO)
-        
-        # 设置格式化器
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(formatter)
-        console_handler.setFormatter(formatter)
-        
-        # 添加处理器
-        self.logger.addHandler(file_handler)
-        self.logger.addHandler(console_handler)
-        
-        self.info(f"日志保存在: {log_file}")
+    Args:
+        log_dir: 日志目录
+        experiment_name: 实验名称
+    """
+    global _global_logger, _log_configured
     
-    def info(self, msg: str) -> None:
-        """记录信息
-        
-        Args:
-            msg: 信息
-        """
-        self.logger.info(msg)
+    # 确保log_dir是logs子目录
+    if os.path.basename(log_dir) != 'logs':
+        experiment_dir = log_dir
+        log_dir = os.path.join(log_dir, 'logs')
+    else:
+        experiment_dir = os.path.dirname(log_dir)
     
-    def warning(self, msg: str) -> None:
-        """记录警告
-        
-        Args:
-            msg: 警告信息
-        """
-        self.logger.warning(msg)
+    os.makedirs(log_dir, exist_ok=True)
     
-    def error(self, msg: str) -> None:
-        """记录错误
-        
-        Args:
-            msg: 错误信息
-        """
-        self.logger.error(msg)
+    # 如果未提供实验名称，则使用实验目录的最后一部分
+    if experiment_name is None:
+        experiment_name = os.path.basename(os.path.normpath(experiment_dir))
+        if not experiment_name or experiment_name == '.':
+            experiment_name = 'experiment'
     
-    def debug(self, msg: str) -> None:
-        """记录调试信息
+    # 设置日志文件名
+    log_file = os.path.join(log_dir, f'{experiment_name}.log')
+    
+    # 设置根日志记录器
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    
+    # 清除已有的处理器
+    if root_logger.handlers:
+        root_logger.handlers.clear()
+    
+    # 创建文件处理器
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(logging.INFO)
+    
+    # 创建控制台处理器
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    
+    # 设置格式化器 - 确保日志中包含模块名称
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+    
+    # 添加处理器
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+    
+    # 创建框架主日志器
+    _global_logger = logging.getLogger('dl_framework')
+    _global_logger.info(f"实验目录: {experiment_dir}")
+    _global_logger.info(f"日志目录: {log_dir}")
+    _global_logger.info(f"日志文件: {log_file}")
+    _global_logger.info(f"实验名称: {experiment_name}")
+    
+    _log_configured = True
+    
+    return _global_logger
+
+def get_logger(module_name: str):
+    """获取特定模块的日志器
+    
+    Args:
+        module_name: 模块名称
         
-        Args:
-            msg: 调试信息
-        """
-        self.logger.debug(msg) 
+    Returns:
+        logging.Logger: 模块日志器
+    """
+    global _log_configured
+    
+    if not _log_configured:
+        # 如果日志系统未配置，使用默认配置
+        default_dir = os.path.join(os.getcwd(), 'experiments', 'default')
+        print(f"警告: 日志系统未配置，使用默认配置: {default_dir}")
+        configure_logging(default_dir)
+    
+    # 返回指定名称的日志器，这将自动从父级继承处理器
+    logger = logging.getLogger(module_name)
+    return logger

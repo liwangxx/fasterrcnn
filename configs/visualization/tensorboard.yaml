@@ -2,6 +2,7 @@ tensorboard:
   enabled: true
   log_dir: "logs/tensorboard"
   flush_secs: 30
+  save_figures: true
 
 hooks:
   - name: "grad_flow"
