@@ -5,28 +5,29 @@ from typing import Dict, Any, List, Optional, Union
 from .base_hook import BaseHook
 from .registry import HookRegistry
 from ..models.cnn import CNN
+from ..utils.logger import get_logger
 
 @HookRegistry.register("FeatureMapHook")
 class FeatureMapHook(BaseHook):
     """特征图可视化钩子"""
     
-    def __init__(self, config: Dict[str, Any], visualizer):
+    def __init__(self, config: Dict[str, Any] = None):
         """初始化
         
         Args:
             config: 钩子配置
-            visualizer: 可视化器
         """
-        super().__init__(config, visualizer)
+        super().__init__(config)
         
         # 获取配置
-        self.max_features = config.get('max_features', 16)  # 每层最多显示的特征数量
-        self.sample_batch_idx = config.get('sample_batch_idx', 0)  # 用于可视化的样本在批次中的索引
-        self.input_shape = config.get('input_shape', None)  # 输入形状，如果为None，则使用实际输入
+        self.max_features = self.config.get('max_features', 16)  # 每层最多显示的特征数量
+        self.sample_batch_idx = self.config.get('sample_batch_idx', 0)  # 用于可视化的样本在批次中的索引
+        self.input_shape = self.config.get('input_shape', None)  # 输入形状，如果为None，则使用实际输入
+        self.logger = get_logger(self.__class__.__module__ + '.' + self.__class__.__name__)
     
     def _setup(self) -> None:
         """设置钩子环境"""
-        pass  # 不需要特别设置
+        pass
     
     def before_step(self, step: int, batch: Any, model: nn.Module) -> None:
         """在每步开始前调用
@@ -52,9 +53,15 @@ class FeatureMapHook(BaseHook):
         # 检查是否应该触发可视化
         if not self.should_trigger(step):
             return
+        
+        # 获取可视化器
+        visualizer = self.get_service("visualizer")
+        if visualizer is None:
+            return
             
-        # 检查模型是否为CNN模型
-        if not isinstance(model, CNN):
+        # 检查模型是否为CNN模型或支持可视化特征的模型
+        if not isinstance(model, CNN) and not hasattr(model, 'visualize_features'):
+            self.logger.warning(f"模型 {type(model).__name__} 不支持特征可视化")
             return
             
         # 获取输入数据
@@ -82,7 +89,7 @@ class FeatureMapHook(BaseHook):
         sample = sample.to(device)
             
         # 调用模型的visualize_features方法
-        model.visualize_features(self.visualizer, sample, step)
+        model.visualize_features(visualizer, sample, step)
     
     def after_epoch(self, epoch: int, model: nn.Module, metrics: Dict[str, float]) -> None:
         """在每个epoch结束后调用

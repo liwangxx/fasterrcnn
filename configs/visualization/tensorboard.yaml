@@ -3,15 +3,3 @@ tensorboard:
   log_dir: "logs/tensorboard"
   flush_secs: 30
   save_figures: true
-
-hooks:
-  - name: "grad_flow"
-    type: "GradientFlowHook"
-    frequency: 100
-    targets: ["conv1", "conv2", "conv3", "fc1", "fc2"] 
-
-  - name: "feature_map_hook"
-    type: "FeatureMapHook"
-    frequency: 100  # 每100步可视化一次
-    max_features: 16  # 每层最多显示16个特征图
-    sample_batch_idx: 0  # 使用批次中的第一个样本进行可视化

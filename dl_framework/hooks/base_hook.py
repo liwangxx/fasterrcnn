@@ -4,34 +4,44 @@ import torch.nn as nn
 from typing import Dict, Any, List, Tuple, Optional, Union, Callable
 
 from ..visualization.base_visualizer import BaseVisualizer
+from ..utils.logger import get_logger
 
 class BaseHook:
-    """可视化钩子基类"""
     
-    def __init__(self, global_config: Dict[str, Any], visualizer: BaseVisualizer):
+    def __init__(self, config: Dict[str, Any] = None):
         """初始化
         
         Args:
-            global_config: 全局配置
-            visualizer: 可视化器
+            config: 钩子配置
         """
-        self.config = global_config.get('visualization', {}).get('hooks', {})
-        self.experiment_dir = global_config.get('experiment_dir', 'experiments/default')
-        self.vis_dir = global_config.get('visualization_dir', os.path.join(self.experiment_dir, 'visualization'))
-        self.visualizer = visualizer
-        # 根据配置初始化钩子
-        for hook_config in self.config:
-            if self.__class__.__name__ == hook_config.get('type', None):
-                self.name = hook_config.get('name', self.__class__.__name__)
-                self.frequency = hook_config.get('frequency', 100)  # 多少步触发一次
-                self.targets = hook_config.get('targets', [])  # 目标模块
-                break
-        
-        # 存储注册的钩子句柄
+        self.config = config or {}
+        self.name = self.config.get('name', self.__class__.__name__)
+        self.frequency = self.config.get('frequency', 100)
+        self.targets = self.config.get('targets', [])
         self.hooks = {}
-        
+        self.services = {}  # 用于存储注入的服务
         # 设置钩子
         self._setup()
+    
+    def register_service(self, service_name: str, service: Any) -> None:
+        """注册外部服务（依赖注入）
+        
+        Args:
+            service_name: 服务名称
+            service: 服务实例
+        """
+        self.services[service_name] = service
+    
+    def get_service(self, service_name: str) -> Any:
+        """获取已注册的服务
+        
+        Args:
+            service_name: 服务名称
+            
+        Returns:
+            服务实例或None
+        """
+        return self.services.get(service_name)
     
     def _setup(self) -> None:
         """设置钩子环境"""
@@ -39,7 +49,7 @@ class BaseHook:
         pass
     
     def should_trigger(self, step: int) -> bool:
-        """检查是否应该触发
+        """检查是否应该触发钩子
         
         Args:
             step: 当前步数
@@ -147,4 +157,38 @@ class BaseHook:
         # 移除所有注册的钩子
         for handle in self.hooks.values():
             handle.remove()
-        self.hooks.clear() 
+        self.hooks.clear()
+
+class HookFactory:
+    """Hook工厂类，用于从配置创建Hook实例"""
+    
+    @staticmethod
+    def create_hooks_from_config(hooks_config: List[Dict[str, Any]]) -> List[BaseHook]:
+        """根据配置创建Hook实例
+        
+        Args:
+            hooks_config: Hook配置列表
+            
+        Returns:
+            创建的Hook实例列表
+        """
+        hooks = []
+        logger = get_logger('hooks')
+        for hook_config in hooks_config:
+            hook_type = hook_config.get('type')
+            if not hook_type:
+                continue
+                
+            try:
+                # 从注册表获取Hook类
+                from .registry import HookRegistry
+                hook_cls = HookRegistry.get(hook_type)
+                # 创建Hook实例
+                hook = hook_cls(hook_config)
+                hooks.append(hook)
+            except KeyError:
+                logger.warning(f"警告: 钩子类型 '{hook_type}' 未注册")
+            except Exception as e:
+                logger.warning(f"创建钩子 '{hook_type}' 时出错: {str(e)}")
+                
+        return hooks

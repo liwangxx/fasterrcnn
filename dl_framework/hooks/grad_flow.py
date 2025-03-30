@@ -3,32 +3,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 
 from .base_hook import BaseHook
 from .registry import HookRegistry
-from ..visualization.base_visualizer import BaseVisualizer
+from ..utils.logger import get_logger
 
 @HookRegistry.register("GradientFlowHook")
 class GradientFlowHook(BaseHook):
     """梯度流可视化钩子，用于可视化模型参数梯度的变化"""
     
-    def __init__(self, config: Dict[str, Any], visualizer: BaseVisualizer):
+    def __init__(self, config: Dict[str, Any] = None):
         """初始化
         
         Args:
             config: 钩子配置
-            visualizer: 可视化器
         """
-        super().__init__(config, visualizer)
+        super().__init__(config)
+        self.logger = get_logger(self.__class__.__module__ + '.' + self.__class__.__name__)
+        self.grad_data = {}
     
     def _setup(self) -> None:
-        """设置钩子环境"""
-        self.save_dir = os.path.join(self.vis_dir, 'grad_flow')
-        os.makedirs(self.save_dir, exist_ok=True)
-        
-        # 存储梯度数据
-        self.grad_data = {}
+        pass
     
     def _register_to_module(self, module: nn.Module, name: str) -> None:
         """向模块注册钩子
@@ -129,7 +125,9 @@ class GradientFlowHook(BaseHook):
             plt.tight_layout()
             
             
-            # 添加到可视化器
-            self.visualizer.add_figure('grad_flow', fig, step)
+            # 添加到可视化器（如果可用）
+            visualizer = self.get_service("visualizer")
+            if visualizer:
+                visualizer.add_figure('grad_flow', fig, step)
         
         plt.close(fig) 

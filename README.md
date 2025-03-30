@@ -70,8 +70,8 @@ logs/                 # 日志目录
 1. 克隆仓库：
 
 ```bash
-git clone https://github.com/yourusername/dl-framework.git
-cd dl-framework
+git clone https://github.com/cyicz123/dl_template
+cd dl_template
 ```
 
 2. 安装uv和同步依赖：

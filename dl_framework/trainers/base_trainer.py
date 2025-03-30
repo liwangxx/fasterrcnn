@@ -54,9 +54,18 @@ class BaseTrainer:
         self.optimizer = self._build_optimizer()
         self.scheduler = self._build_scheduler()
         
-        # 构建可视化器和钩子
+        # 构建可视化器
         self.visualizer = self._build_visualizer()
-        self.hooks = self._build_hooks()
+        
+        # 服务容器 - 存储所有可用服务
+        self._services: Dict[str, Any] = {}
+        
+        # 注册默认服务
+        self._register_default_services()
+        
+        # 构建钩子
+        self.hooks = [] 
+        self._build_hooks()
         
         # 训练状态
         self.current_epoch = 0
@@ -77,6 +86,76 @@ class BaseTrainer:
             self.best_metric = checkpoint.get('metrics', {}).get('loss', float('inf'))
             self.logger.info(f"从检查点恢复训练: {resume_path}")
             self.logger.info(f"从epoch {self.current_epoch} 继续训练")
+    
+    def _register_default_services(self) -> None:
+        """注册默认服务"""
+        # 注册训练器自身
+        self.register_service("trainer", self)
+        
+        # 注册配置
+        self.register_service("config", self.config)
+        
+        # 注册模型
+        self.register_service("model", self.model)
+        
+        # 注册数据加载器
+        self.register_service("train_loader", self.train_loader)
+        self.register_service("val_loader", self.val_loader)
+        
+        # 注册优化器和调度器
+        self.register_service("optimizer", self.optimizer)
+        self.register_service("scheduler", self.scheduler)
+        
+        # 注册设备
+        self.register_service("device", self.device)
+        
+        # 注册日志器
+        self.register_service("logger", self.logger)
+        
+        # 注册目录路径
+        self.register_service("experiment_dir", self.experiment_dir)
+        self.register_service("checkpoints_dir", self.checkpoints_dir)
+        self.register_service("logs_dir", self.logs_dir)
+        self.register_service("visualization_dir", self.visualization_dir)
+        
+        # 注册可视化器(如果存在)
+        if self.visualizer is not None:
+            self.register_service("visualizer", self.visualizer)
+    
+    def register_service(self, service_name: str, service: Any) -> None:
+        """注册服务
+        
+        Args:
+            service_name: 服务名称，用于Hook获取服务
+            service: 服务实例
+        """
+        self._services[service_name] = service
+        self.logger.debug(f"服务已注册: {service_name}")
+    
+    def get_service(self, service_name: str) -> Optional[Any]:
+        """获取服务
+        
+        Args:
+            service_name: 服务名称
+            
+        Returns:
+            服务实例，如果不存在则返回None
+        """
+        return self._services.get(service_name)
+    
+    def register_hook(self, hook: BaseHook) -> None:
+        """注册钩子
+        
+        Args:
+            hook: 钩子实例
+        """
+        # 注入所有当前可用的服务
+        for service_name, service in self._services.items():
+            hook.register_service(service_name, service)
+        
+        # 将钩子添加到列表中
+        self.hooks.append(hook)
+        self.logger.info(f"钩子已注册: {hook.name} ({hook.__class__.__name__})")
     
     def _build_logger(self) -> logging.Logger:
         """构建日志记录器
@@ -289,33 +368,32 @@ class BaseTrainer:
         Returns:
             钩子列表
         """
-        hooks = []
+        # 检查配置中是否有hooks部分
+        hooks_config = self.config.get('hooks', [])
         
-        # 检查可视化配置中是否有钩子配置
-        vis_config = self.config.get('visualization', {})
-        hooks_config = vis_config.get('hooks', [])
+        if not hooks_config:
+            self.logger.info("未配置钩子")
+            return
         
-        if not hooks_config or not self.visualizer:
-            return hooks
+        # 使用Hook工厂创建钩子实例
+        try:
+            from ..hooks.base_hook import HookFactory
+            hooks = HookFactory.create_hooks_from_config(hooks_config)
             
-        # 创建钩子实例
-        for hook_config in hooks_config:
-            hook_type = hook_config.get('type')
-            if not hook_type:
-                self.logger.warning(f"跳过未指定类型的钩子: {hook_config}")
-                continue
+            # 注册服务到每个钩子
+            for hook in hooks:
+                self.register_hook(hook)
                 
-            try:
-                hook_class = HookRegistry.get(hook_type)
-                hook = hook_class(self.config, self.visualizer)
-                hooks.append(hook)
-                self.logger.info(f"添加钩子: {hook_type} 目标: {hook_config.get('targets', [])}")
-            except KeyError:
-                self.logger.warning(f"未知的钩子类型: {hook_type}")
-            except Exception as e:
-                self.logger.error(f"创建钩子 {hook_type} 时出错: {e}")
+        except ImportError:
+            raise ImportError("无法导入HookFactory，请确保hooks配置正确")
+    
+    def register_hooks_from_config(self) -> None:
+        """从配置创建并注册所有钩子"""
+        # 如果已经有钩子，先清空
+        self.hooks = []
         
-        return hooks
+        # 重新构建钩子
+        self.hooks = self._build_hooks()
     
     def train(self) -> nn.Module:
         """训练模型

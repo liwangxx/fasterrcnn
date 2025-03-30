@@ -50,8 +50,8 @@ def configure_logging(log_dir: str, experiment_name: Optional[str] = None):
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
     
-    # 设置格式化器 - 确保日志中包含模块名称
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # 设置格式化器 - 增加文件名和行号信息
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
     file_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
     
