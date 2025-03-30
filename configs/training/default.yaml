@@ -17,6 +17,9 @@ training:
   early_stopping:
     patience: 10
     min_delta: 0.001 
+  checkpoint:
+    save_frequency: 5  # 每5个epoch保存一次权重
+    keep_num: 3  # 保留最近的3个checkpoint
 
 # 钩子配置示例
 hooks:

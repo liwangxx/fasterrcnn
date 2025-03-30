@@ -230,6 +230,9 @@ training:
   early_stopping:
     patience: 10
     min_delta: 0.001
+  checkpoint:
+    save_frequency: 5  # 每5个epoch保存一次检查点，不配置此项则只保存最新和最好的模型
+    keep_num: 3  # 保留最近的3个检查点
 ```
 
 ### 可视化配置

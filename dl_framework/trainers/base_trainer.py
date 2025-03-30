@@ -595,6 +595,11 @@ class BaseTrainer:
         Args:
             metrics: 性能指标
         """
+        # 获取checkpoint配置
+        checkpoint_config = self.config.get('training', {}).get('checkpoint', {})
+        save_frequency = checkpoint_config.get('save_frequency', None)  # 如果未配置，则为None
+        keep_num = checkpoint_config.get('keep_num', 5)  # 默认保留最近5个
+        
         # 当前模型检查点路径
         latest_checkpoint_path = os.path.join(self.checkpoints_dir, 'model_latest.pth')
         
@@ -607,6 +612,24 @@ class BaseTrainer:
             epoch=self.current_epoch,
             metrics=metrics
         )
+        
+        # 根据频率保存周期性检查点 - 只有当显式配置了save_frequency时才执行
+        if save_frequency is not None and (self.current_epoch + 1) % save_frequency == 0:
+            epoch_checkpoint_path = os.path.join(
+                self.checkpoints_dir, f'model_epoch_{self.current_epoch + 1}.pth'
+            )
+            save_checkpoint(
+                self.model,
+                epoch_checkpoint_path,
+                optimizer=self.optimizer,
+                scheduler=self.scheduler,
+                epoch=self.current_epoch,
+                metrics=metrics
+            )
+            self.logger.info(f"在epoch {self.current_epoch + 1}保存周期性检查点")
+            
+            # 清理旧的检查点文件
+            self._cleanup_old_checkpoints(keep_num)
         
         # 判断是否需要保存最佳模型
         if self._is_best_checkpoint(metrics):
@@ -621,6 +644,34 @@ class BaseTrainer:
             )
             self.best_metric = metrics['loss']
             self.logger.info(f"保存最佳模型，验证损失: {metrics['loss']:.4f}")
+    
+    def _cleanup_old_checkpoints(self, keep_num: int) -> None:
+        """清理旧的检查点文件，只保留最新的几个
+        
+        Args:
+            keep_num: 要保留的检查点数量
+        """
+        # 获取所有周期性检查点
+        checkpoints = []
+        for filename in os.listdir(self.checkpoints_dir):
+            if filename.startswith('model_epoch_') and filename.endswith('.pth'):
+                try:
+                    epoch = int(filename.split('_')[-1].split('.')[0])
+                    checkpoints.append((epoch, os.path.join(self.checkpoints_dir, filename)))
+                except:
+                    continue
+        
+        # 按照epoch排序
+        checkpoints.sort(reverse=True)
+        
+        # 删除多余的旧检查点
+        if len(checkpoints) > keep_num:
+            for _, checkpoint_path in checkpoints[keep_num:]:
+                try:
+                    os.remove(checkpoint_path)
+                    self.logger.debug(f"删除旧检查点: {checkpoint_path}")
+                except:
+                    self.logger.warning(f"无法删除检查点: {checkpoint_path}")
     
     def _is_best_checkpoint(self, metrics: Dict[str, float]) -> bool:
         """判断是否需要保存最佳模型
