@@ -1,16 +1,33 @@
-# DL-Framework - 深度学习训练框架
+# DL-Template - 深度学习训练框架
 
-一个用于深度学习实验和研究的轻量级PyTorch训练框架。该框架提供了一套完整的工具，用于构建、训练和评估深度学习模型，同时支持模型和数据集的注册机制以及可视化功能。
+<div align="center">
+  <strong>一个轻量级、模块化的PyTorch深度学习训练框架</strong>
+  <br>
+  <br>
+</div>
+
+<p align="center">
+  <a href="#特点">特点</a> •
+  <a href="#目录结构">目录结构</a> •
+  <a href="#安装">安装</a> •
+  <a href="#快速开始">快速开始</a> •
+  <a href="#文档">文档</a> •
+  <a href="#许可证">许可证</a>
+</p>
+
+<br>
+
+DL-Template是一个用于深度学习实验和研究的轻量级PyTorch训练框架。该框架提供了一套完整的工具，用于构建、训练和评估深度学习模型，同时支持模型和数据集的注册机制以及可视化功能。
 
 ## 特点
 
-- 模块化设计，易于扩展和定制
-- 模型和数据集的注册和检索系统
-- 灵活的配置系统，支持YAML配置
-- 内置可视化功能，支持TensorBoard
-- 梯度流等监控工具
-- 自动保存检查点和恢复训练
-- 支持早停和学习率调度
+✨ **模块化设计** - 框架各组件解耦，易于扩展和定制  
+🔄 **注册系统** - 模型和数据集的注册和检索系统  
+📝 **配置系统** - 灵活的YAML配置支持，使实验管理更简单  
+📊 **可视化支持** - 内置TensorBoard支持，提供丰富的可视化功能  
+📈 **监控工具** - 梯度流、特征图等深度监控工具  
+💾 **检查点管理** - 自动保存检查点和恢复训练  
+<!-- ⏱️ **训练优化** - 支持早停和多种学习率调度策略   -->
 
 ## 目录结构
 
@@ -50,8 +67,13 @@ configs/              # 配置文件
 tools/                # 命令行工具
 └── train.py          # 训练入口脚本
 
-checkpoints/          # 检查点目录
-logs/                 # 日志目录
+docs/                 # 文档
+experiments/          # 实验结果文件夹
+└── experiment_20250330_235610 # 单次结果文件夹
+    ├── checkpoints # 检查点文件夹
+    ├── config.yaml # 配置文件
+    ├── logs # 日志文件夹
+    └── visualization # 可视化文件夹
 ```
 
 ## 安装
@@ -81,9 +103,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 ```
 
-## 使用方法
-
-### 训练模型
+## 快速开始
 
 使用默认配置训练模型：
 
@@ -103,152 +123,15 @@ python tools/train.py --config configs/training/default.yaml --vis configs/visua
 python tools/train.py --config configs/training/default.yaml --device cuda:0
 ```
 
-### 创建自定义模型
+## 文档
 
-1. 创建模型类：
+详细文档请参考以下链接：
 
-```python
-# dl_framework/models/your_model.py
-import torch.nn as nn
-from .base_model import BaseModel
-from .registry import ModelRegistry
-
-@ModelRegistry.register('your_model')
-class YourModel(BaseModel):
-    def __init__(self, config):
-        super().__init__(config)
-        # 初始化模型层
-        
-    def forward(self, x):
-        # 实现前向传播
-        return x
-        
-    def get_loss(self, outputs, targets):
-        # 实现损失计算
-        return loss
-```
-
-2. 创建模型配置：
-
-```yaml
-# configs/models/your_model.yaml
-model:
-  type: "your_model"
-  # 其他模型参数
-```
-
-3. 在训练配置中使用：
-
-```yaml
-# configs/training/your_model_training.yaml
-model_config: "configs/models/your_model.yaml"
-dataset_config: "configs/datasets/cifar10.yaml"
-# 其他训练参数
-```
-
-### 创建自定义数据集
-
-1. 创建数据集类：
-
-```python
-# dl_framework/datasets/your_dataset.py
-from .base_dataset import BaseDataset
-from .registry import DatasetRegistry
-
-@DatasetRegistry.register('your_dataset')
-class YourDataset(BaseDataset):
-    def __init__(self, config, is_training=True):
-        super().__init__(config, is_training)
-        self._load_data()
-        
-    def _load_data(self):
-        # 加载数据
-        
-    def __len__(self):
-        # 返回数据集长度
-        
-    def __getitem__(self, idx):
-        # 返回数据项
-```
-
-2. 创建数据集配置：
-
-```yaml
-# configs/datasets/your_dataset.yaml
-dataset:
-  type: "your_dataset"
-  # 其他数据集参数
-```
-
-## 配置示例
-
-### 模型配置
-
-```yaml
-model:
-  type: "cnn"
-  in_channels: 3
-  num_classes: 10
-```
-
-### 数据集配置
-
-```yaml
-dataset:
-  type: "cifar10"
-  data_dir: "data/cifar10"
-  batch_size: 64
-  num_workers: 4
-  transforms:
-    resize: [32, 32]
-    normalize:
-      mean: [0.4914, 0.4822, 0.4465]
-      std: [0.2023, 0.1994, 0.2010]
-```
-
-### 训练配置
-
-```yaml
-model_config: "configs/models/cnn.yaml"
-dataset_config: "configs/datasets/cifar10.yaml"
-
-seed: 42
-device: "cuda"
-output_dir: "checkpoints/default"
-log_dir: "logs/default"
-
-training:
-  epochs: 50
-  optimizer:
-    type: "adam"
-    lr: 0.001
-    weight_decay: 1e-5
-  scheduler:
-    type: "cosine"
-    T_max: 50
-    eta_min: 0.0001
-  early_stopping:
-    patience: 10
-    min_delta: 0.001
-  checkpoint:
-    save_frequency: 5  # 每5个epoch保存一次检查点，不配置此项则只保存最新和最好的模型
-    keep_num: 3  # 保留最近的3个检查点
-```
-
-### 可视化配置
-
-```yaml
-tensorboard:
-  enabled: true
-  log_dir: "logs/tensorboard"
-  flush_secs: 30
-
-hooks:
-  - name: "grad_flow"
-    type: "GradientFlowHook"
-    frequency: 100
-    targets: ["conv1", "conv2", "conv3", "fc1", "fc2"]
-```
+- [使用指南](docs/usage_guide.md) - 框架基本使用方法
+- [自定义模型教程](docs/custom_model.md) - 如何创建和注册自定义模型
+- [自定义数据集教程](docs/custom_dataset.md) - 如何创建和注册自定义数据集
+- [TensorBoard可视化](docs/tensorboard_visualization.md) - 如何使用TensorBoard进行可视化
+- [钩子系统使用指南](docs/hooks_usage.md) - 如何使用钩子系统扩展训练功能
 
 ## 许可证
 
