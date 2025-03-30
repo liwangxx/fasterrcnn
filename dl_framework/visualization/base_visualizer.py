@@ -216,4 +216,30 @@ class BaseVisualizer:
     def _close_impl(self) -> None:
         """关闭可视化器的具体实现"""
         # 子类需要实现此方法
+        pass
+    
+    def add_images_grid(self, tag: str, img_tensor: torch.Tensor, global_step: int, nrow: int = 8) -> None:
+        """添加图像网格
+        
+        Args:
+            tag: 图像标签
+            img_tensor: 形状为[B, C, H, W]的图像张量批次
+            global_step: 全局步数
+            nrow: 网格中每行的图像数量
+        """
+        if not self.visualizer_config:
+            return
+        
+        self._add_images_grid_impl(tag, img_tensor, global_step, nrow)
+    
+    def _add_images_grid_impl(self, tag: str, img_tensor: torch.Tensor, global_step: int, nrow: int = 8) -> None:
+        """添加图像网格的具体实现
+        
+        Args:
+            tag: 图像标签
+            img_tensor: 形状为[B, C, H, W]的图像张量批次
+            global_step: 全局步数
+            nrow: 网格中每行的图像数量
+        """
+        # 子类需要实现此方法
         pass 

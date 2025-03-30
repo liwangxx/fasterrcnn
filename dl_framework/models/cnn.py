@@ -150,6 +150,9 @@ class CNN(BaseModel):
         if len(input_tensor.shape) == 3:
             input_tensor = input_tensor.unsqueeze(0)
             
+        # 首先可视化输入图像
+        visualizer.add_image("input/original", input_tensor[0], global_step)
+        
         # 执行前向传播并获取特征
         with torch.no_grad():
             _, features = self.forward_with_features(input_tensor)
@@ -162,13 +165,22 @@ class CNN(BaseModel):
                     # 将特征图移动到CPU进行可视化
                     feature_map = feature_map.cpu()
                     
-                    # 使用可视化器的方法
-                    for i in range(min(feature_map.size(1), 16)):  # 最多显示16个通道
+                    # 1. 添加特征图的网格视图
+                    num_channels = min(feature_map.size(1), 64)  # 最多显示64个通道
+                    channels = []
+                    for i in range(num_channels):
+                        # 从第一个批次样本中提取单个通道并转为3通道
                         channel_map = feature_map[0, i].unsqueeze(0)  # [1, H, W]
-                        tag = f"features/{layer_name}/channel_{i}"
-                        visualizer.add_image(tag, channel_map, global_step)
-                        
-                    # 添加特征图统计信息
+                        # 如果是单通道，转换为三通道以便于可视化
+                        if channel_map.dim() == 3 and channel_map.size(0) == 1:
+                            channel_map = channel_map.expand(3, -1, -1)  # [3, H, W]
+                        channels.append(channel_map)
+                    
+                    # 创建通道的网格视图
+                    if channels:
+                        channel_tensor = torch.stack(channels)  # [num_channels, 3, H, W]
+                        visualizer.add_images_grid(f"features_grid/{layer_name}", channel_tensor, global_step, nrow=8)
+                    
                     visualizer.add_histogram(f"features/{layer_name}/histogram", feature_map, global_step)
     
     def get_loss(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:

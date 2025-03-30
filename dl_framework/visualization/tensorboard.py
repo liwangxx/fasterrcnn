@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import Dict, Any, List, Union, Optional
 from torch.utils.tensorboard import SummaryWriter
+from torchvision.utils import make_grid
 
 from .base_visualizer import BaseVisualizer
 from .registry import VisualizerRegistry
@@ -29,10 +30,6 @@ class TensorBoardVisualizer(BaseVisualizer):
                 log_dir=self.vis_dir,
                 flush_secs=self.flush_secs
             )
-            
-            # 保存样本图像的目录
-            self.sample_dir = os.path.join(self.vis_dir, 'samples')
-            os.makedirs(self.sample_dir, exist_ok=True)
     
     def _add_scalar_impl(self, tag: str, scalar_value: float, global_step: int) -> None:
         """添加标量的具体实现
@@ -64,6 +61,18 @@ class TensorBoardVisualizer(BaseVisualizer):
         """
         self.writer.add_image(tag, img_tensor, global_step)
     
+    def _add_images_grid_impl(self, tag: str, img_tensor: torch.Tensor, global_step: int, nrow: int = 8) -> None:
+        """添加图像网格的具体实现
+        
+        Args:
+            tag: 图像标签
+            img_tensor: 形状为[B, C, H, W]的图像张量批次
+            global_step: 全局步数
+            nrow: 网格中每行的图像数量
+        """
+        grid = make_grid(img_tensor, nrow=nrow, normalize=True)
+        self.writer.add_image(tag, grid, global_step)
+    
     def _add_histogram_impl(self, tag: str, values: Union[torch.Tensor, np.ndarray], global_step: int) -> None:
         """添加直方图的具体实现
         
@@ -86,7 +95,9 @@ class TensorBoardVisualizer(BaseVisualizer):
         
         # 可选地保存图像到文件
         if self.visualizer_config.get('save_figures', False):
-            fig_path = os.path.join(self.sample_dir, f"{tag}_{global_step}.png")
+            # 构造文件名，替换可能的非法字符
+            safe_tag = tag.replace('/', '_').replace('\\', '_')
+            fig_path = os.path.join(self.sample_dir, f"{safe_tag}_{global_step}.png")
             figure.savefig(fig_path)
     
     def _add_text_impl(self, tag: str, text_string: str, global_step: int) -> None:
