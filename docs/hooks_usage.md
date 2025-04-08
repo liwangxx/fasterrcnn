@@ -21,6 +21,7 @@ Hook（钩子）是在训练过程的特定时刻执行的回调函数。我们�
 1. **FeatureMapHook** - 可视化CNN模型的特征图
 2. **GradientFlowHook** - 跟踪和可视化梯度流
 3. **TimeTrackingHook** - 跟踪训练时间和预测完成时间
+4. **SystemMonitorHook** - 监控CPU、内存和GPU资源使用情况
 
 ## 通过配置文件使用Hook
 
@@ -55,6 +56,15 @@ hooks:
     frequency: 100  # 每100步可视化一次
     max_features: 16
     sample_batch_idx: 0
+    
+  - type: "SystemMonitorHook"
+    name: "system_monitor"
+    frequency: 10  # 每10步记录一次系统资源使用情况
+    interval: 2  # 采样间隔（秒）
+    track_cpu: true  # 是否监控CPU使用率
+    track_memory: true  # 是否监控内存使用率
+    track_gpu: true  # 是否监控GPU使用率
+    track_gpu_memory: true  # 是否监控GPU内存使用率
 ```
 
 然后在代码中加载配置和创建训练器：

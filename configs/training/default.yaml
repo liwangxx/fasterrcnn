@@ -37,3 +37,12 @@ hooks:
     name: "gradient_visualizer"
     frequency: 200
     targets: ["conv1", "conv2", "conv3", "fc1", "fc2"]  # 要监视的模块
+    
+  - type: "SystemMonitorHook"
+    name: "system_monitor"
+    frequency: 50  # 每50步更新一次可视化（可根据需要调整）
+    interval: 2  # 数据采集间隔（秒）
+    track_cpu: true  # 是否监控CPU使用率
+    track_memory: true  # 是否监控内存使用率
+    track_gpu: true  # 是否监控GPU使用率
+    track_gpu_memory: true  # 是否监控GPU内存使用率

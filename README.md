@@ -86,6 +86,8 @@ experiments/          # 实验结果文件夹
 - pyyaml
 - matplotlib
 - tensorboard
+- psutil
+- pynvml
 
 ### 步骤
 
