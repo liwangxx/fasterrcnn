@@ -22,7 +22,7 @@ DL-Template是一个用于深度学习实验和研究的轻量级PyTorch训练�
 ## 特点
 
 ✨ **模块化设计** - 框架各组件解耦，易于扩展和定制  
-🔄 **注册系统** - 模型和数据集的注册和检索系统  
+🔄 **注册系统** - 模型、数据集和损失函数的注册和检索系统  
 📝 **配置系统** - 灵活的YAML配置支持，使实验管理更简单  
 📊 **可视化支持** - 内置TensorBoard支持，提供丰富的可视化功能  
 📈 **监控工具** - 梯度流、特征图等深度监控工具  
@@ -41,6 +41,12 @@ dl_framework/
 │   ├── registry.py      # 数据集注册系统
 │   ├── base_dataset.py  # 数据集基类
 │   └── cifar10.py       # CIFAR-10数据集实现
+├── losses/              # 损失函数定义
+│   ├── registry.py      # 损失函数注册系统
+│   ├── base_loss.py     # 损失函数基类
+│   ├── cross_entropy.py # 交叉熵损失函数
+│   ├── mse_loss.py      # 均方误差损失函数
+│   └── l1_loss.py       # L1损失函数
 ├── trainers/            # 训练器
 │   └── base_trainer.py  # 训练器基类
 ├── visualization/       # 可视化工具
@@ -132,6 +138,7 @@ python tools/train.py --config configs/training/default.yaml --device cuda:0
 - [使用指南](docs/usage_guide.md) - 框架基本使用方法
 - [自定义模型教程](docs/custom_model.md) - 如何创建和注册自定义模型
 - [自定义数据集教程](docs/custom_dataset.md) - 如何创建和注册自定义数据集
+- [自定义损失函数教程](docs/losses.md) - 如何创建和注册自定义损失函数
 - [TensorBoard可视化](docs/tensorboard_visualization.md) - 如何使用TensorBoard进行可视化
 - [钩子系统使用指南](docs/hooks_usage.md) - 如何使用钩子系统扩展训练功能
 

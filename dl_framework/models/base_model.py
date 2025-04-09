@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
-from typing import Dict, Any, Tuple, Union, List
+from typing import Dict, Any, Tuple, Union, List, Optional
+
+from ..losses.registry import LossRegistry
 
 class BaseModel(nn.Module):
     """所有模型的基类"""
@@ -13,6 +15,11 @@ class BaseModel(nn.Module):
         """
         super().__init__()
         self.config = config or {}
+        
+        # 如果配置中包含损失函数配置，则创建损失函数
+        self.loss = None
+        if 'loss' in self.config:
+            self.loss = LossRegistry.create(self.config['loss'])
         
     def forward(self, x: torch.Tensor) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         """前向传播
@@ -29,6 +36,9 @@ class BaseModel(nn.Module):
                 targets: Union[torch.Tensor, Dict[str, torch.Tensor]]) -> torch.Tensor:
         """计算损失
         
+        如果模型配置中指定了损失函数，则使用该损失函数；
+        否则，子类应该实现自己的损失计算逻辑。
+        
         Args:
             outputs: 模型输出
             targets: 目标值
@@ -36,7 +46,11 @@ class BaseModel(nn.Module):
         Returns:
             损失值
         """
-        raise NotImplementedError("子类必须实现get_loss方法")
+        if self.loss is not None:
+            return self.loss(outputs, targets)
+        
+        # 对于没有指定损失函数的旧模型，子类需要实现此方法
+        raise NotImplementedError("模型未指定损失函数，子类必须实现get_loss方法")
     
     def predict(self, x: torch.Tensor) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         """预测（用于推理）

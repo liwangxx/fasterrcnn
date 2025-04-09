@@ -1,4 +1,9 @@
 model:
   type: "cnn"
   in_channels: 3
-  num_classes: 10 
+  num_classes: 10
+  loss:
+    type: "cross_entropy"
+    reduction: "mean"
+    label_smoothing: 0.1
+    weight: 1.0 

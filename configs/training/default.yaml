@@ -4,6 +4,13 @@ dataset_config: "configs/datasets/cifar10.yaml"
 seed: 42
 device: "cuda"
 
+# # 损失函数配置
+# loss:
+#   type: "cross_entropy"
+#   reduction: "mean"
+#   label_smoothing: 0.1
+#   weight: 1.0
+
 training:
   epochs: 50
   optimizer:

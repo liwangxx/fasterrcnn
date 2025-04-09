@@ -193,5 +193,10 @@ class CNN(BaseModel):
         Returns:
             损失值
         """
+        # 首先尝试使用配置中指定的损失函数
+        if hasattr(self, 'loss') and self.loss is not None:
+            return super().get_loss(outputs, targets)
+        
+        # 否则使用默认的交叉熵损失
         loss_fn = nn.CrossEntropyLoss()
         return loss_fn(outputs, targets) 

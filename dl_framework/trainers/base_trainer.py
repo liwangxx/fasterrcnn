@@ -7,6 +7,7 @@ from typing import Dict, Any, List, Tuple, Callable, Optional, Union
 
 from ..models.registry import ModelRegistry
 from ..datasets.registry import DatasetRegistry
+from ..losses.registry import LossRegistry
 from ..utils.logger import get_logger
 import logging
 from ..utils.checkpoint import save_checkpoint, load_checkpoint
@@ -49,6 +50,9 @@ class BaseTrainer:
         # 构建模型和数据加载器
         self.model = self._build_model()
         self.train_loader, self.val_loader = self._build_data_loaders()
+        
+        # 构建损失函数（如果在配置中指定）
+        self.loss = self._build_loss()
         
         # 构建优化器和学习率调度器
         self.optimizer = self._build_optimizer()
@@ -126,6 +130,10 @@ class BaseTrainer:
         # 注册可视化器(如果存在)
         if self.visualizer is not None:
             self.register_service("visualizer", self.visualizer)
+        
+        # 注册损失函数（如果存在）
+        if hasattr(self, 'loss') and self.loss is not None:
+            self.register_service("loss", self.loss)
     
     def register_service(self, service_name: str, service: Any) -> None:
         """注册服务
@@ -400,6 +408,28 @@ class BaseTrainer:
         # 重新构建钩子
         self.hooks = self._build_hooks()
     
+    def _build_loss(self) -> Optional[nn.Module]:
+        """构建损失函数
+        
+        优先级:
+        1. 训练配置中的独立损失函数配置
+        2. 模型配置中的损失函数配置（已在模型初始化时处理）
+        
+        如果都没有指定，返回None，使用模型内置的损失函数逻辑
+        
+        Returns:
+            损失函数或None
+        """
+        # 检查训练配置中是否有损失函数配置
+        loss_config = self.config.get('loss')
+        if not loss_config:
+            # 无损失函数配置，使用模型内置损失函数
+            self.logger.info("使用模型内置损失函数")
+            return None
+            
+        self.logger.info(f"从配置构建损失函数: {loss_config.get('type')}")
+        return LossRegistry.create(loss_config)
+    
     def train(self) -> nn.Module:
         """训练模型
         
@@ -479,7 +509,7 @@ class BaseTrainer:
         """训练一个epoch
         
         Returns:
-            训练指标
+            训练指标字典
         """
         self.model.train()
         total_loss = 0
@@ -507,7 +537,12 @@ class BaseTrainer:
             outputs = self.model(inputs)
             
             # 计算损失
-            loss = self.model.get_loss(outputs, targets)
+            if self.loss is not None:
+                # 使用独立配置的损失函数
+                loss = self.loss(outputs, targets)
+            else:
+                # 使用模型内置的损失计算逻辑
+                loss = self.model.get_loss(outputs, targets)
             
             # 反向传播
             loss.backward()
@@ -549,7 +584,7 @@ class BaseTrainer:
         """验证一个epoch
         
         Returns:
-            验证指标
+            验证指标字典
         """
         self.model.eval()
         total_loss = 0
@@ -573,7 +608,12 @@ class BaseTrainer:
                 outputs = self.model(inputs)
                 
                 # 计算损失
-                loss = self.model.get_loss(outputs, targets)
+                if self.loss is not None:
+                    # 使用独立配置的损失函数
+                    loss = self.loss(outputs, targets)
+                else:
+                    # 使用模型内置的损失计算逻辑
+                    loss = self.model.get_loss(outputs, targets)
                 
                 # 累积损失
                 total_loss += loss.item()
@@ -778,7 +818,7 @@ class BaseTrainer:
             test_loader: 测试数据加载器，如果为None则使用验证数据加载器
             
         Returns:
-            测试指标
+            测试指标字典
         """
         if test_loader is None:
             test_loader = self.val_loader
@@ -805,7 +845,10 @@ class BaseTrainer:
                 outputs = self.model(inputs)
                 
                 # 计算损失
-                loss = self.model.get_loss(outputs, targets)
+                if self.loss is not None:
+                    loss = self.loss(outputs, targets)
+                else:
+                    loss = self.model.get_loss(outputs, targets)
                 
                 # 累积损失
                 total_loss += loss.item()
