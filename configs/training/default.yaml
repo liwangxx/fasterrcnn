@@ -15,8 +15,10 @@ training:
     T_max: 50
     eta_min: 0.0001
   early_stopping:
-    patience: 10
-    min_delta: 0.001 
+    patience: 50
+    min_delta: 0.001
+    monitor: "loss"
+    mode: "min"
   checkpoint:
     save_frequency: 5  # 每5个epoch保存一次权重
     # keep_num: 3  # 保留最近的3个checkpoint

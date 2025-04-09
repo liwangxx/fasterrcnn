@@ -71,6 +71,10 @@ class BaseTrainer:
         self.current_epoch = 0
         self.global_step = 0
         self.best_metric = float('inf')  # 用于模型检查点保存
+
+        # 早停法相关参数
+        self.early_stopping_counter = 0
+        self.best_early_stopping_metric = float('inf')
         
         # 加载检查点（如果指定）
         resume_path = config.get('resume')
@@ -84,6 +88,7 @@ class BaseTrainer:
             )
             self.current_epoch = checkpoint.get('epoch', 0)
             self.best_metric = checkpoint.get('metrics', {}).get('loss', float('inf'))
+            self.best_early_stopping_metric = self.best_metric  # 初始化早停指标
             self.logger.info(f"从检查点恢复训练: {resume_path}")
             self.logger.info(f"从epoch {self.current_epoch} 继续训练")
     
@@ -730,10 +735,40 @@ class BaseTrainer:
         if not early_stopping_config:
             return False
             
+        # 从配置中获取早停参数
         patience = early_stopping_config.get('patience', 10)
         min_delta = early_stopping_config.get('min_delta', 0.001)
+        monitor = early_stopping_config.get('monitor', 'loss')  # 监控的指标，默认为loss
+        mode = early_stopping_config.get('mode', 'min')  # 模式，min表示指标越小越好，max表示指标越大越好
         
-        # 子类可以实现早停逻辑
+        # 如果指定的指标不存在，直接返回False
+        if monitor not in metrics:
+            self.logger.warning(f"早停监控的指标 {monitor} 不存在于当前指标中")
+            return False
+        
+        current_metric = metrics[monitor]
+        
+        # 判断是否需要更新最佳指标
+        if mode == 'min':
+            is_better = current_metric < self.best_early_stopping_metric - min_delta
+        else:  # mode == 'max'
+            is_better = current_metric > self.best_early_stopping_metric + min_delta
+            
+        if is_better:
+            # 如果当前指标更好，重置计数器并更新最佳指标
+            self.best_early_stopping_metric = current_metric
+            self.early_stopping_counter = 0
+            return False
+        else:
+            # 如果当前指标没有改善，增加计数器
+            self.early_stopping_counter += 1
+            self.logger.info(f"早停计数器: {self.early_stopping_counter}/{patience}")
+            
+            # 如果连续patience次没有改善，触发早停
+            if self.early_stopping_counter >= patience:
+                self.logger.info(f"早停触发: {monitor} 在 {patience} 个epoch中没有改善")
+                return True
+        
         return False
     
     def test(self, test_loader: Optional[DataLoader] = None) -> Dict[str, float]:
