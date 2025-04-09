@@ -610,51 +610,50 @@ class BaseTrainer:
         should_save_periodic = (save_frequency is not None and (self.current_epoch + 1) % save_frequency == 0)
         
         # 只有在需要保存周期性检查点或是最佳模型时才实际保存文件
-        if should_save_periodic or self._is_best_checkpoint(metrics):
-            if should_save_periodic:
-                # 保存周期性检查点
-                epoch_checkpoint_path = os.path.join(
-                    self.checkpoints_dir, f'model_epoch_{self.current_epoch + 1}.pth'
-                )
+        if should_save_periodic:
+            # 保存周期性检查点
+            epoch_checkpoint_path = os.path.join(
+                self.checkpoints_dir, f'model_epoch_{self.current_epoch + 1}.pth'
+            )
+            
+            # 保存检查点
+            save_checkpoint(
+                self.model,
+                epoch_checkpoint_path,
+                optimizer=self.optimizer,
+                scheduler=self.scheduler,
+                epoch=self.current_epoch,
+                metrics=metrics
+            )
+            self.logger.info(f"在epoch {self.current_epoch + 1}保存周期性检查点")
+            
+            # 如果当前系统支持硬链接，则创建一个硬链接作为最新检查点
+            try:
+                # 如果最新检查点文件已存在，先删除它
+                if os.path.exists(latest_checkpoint_path):
+                    os.remove(latest_checkpoint_path)
                 
-                # 保存检查点
+                # 创建硬链接，这样latest就指向最近保存的周期性检查点
+                os.link(epoch_checkpoint_path, latest_checkpoint_path)
+                self.logger.debug(f"创建了硬链接从 {epoch_checkpoint_path} 到 {latest_checkpoint_path}")
+            except OSError as e:
+                # 如果硬链接失败（例如，跨文件系统或其他限制），则直接复制文件
+                self.logger.warning(f"创建硬链接失败，将直接复制文件: {e}")
                 save_checkpoint(
                     self.model,
-                    epoch_checkpoint_path,
+                    latest_checkpoint_path,
                     optimizer=self.optimizer,
                     scheduler=self.scheduler,
                     epoch=self.current_epoch,
                     metrics=metrics
                 )
-                self.logger.info(f"在epoch {self.current_epoch + 1}保存周期性检查点")
-                
-                # 如果当前系统支持硬链接，则创建一个硬链接作为最新检查点
-                try:
-                    # 如果最新检查点文件已存在，先删除它
-                    if os.path.exists(latest_checkpoint_path):
-                        os.remove(latest_checkpoint_path)
-                    
-                    # 创建硬链接，这样latest就指向最近保存的周期性检查点
-                    os.link(epoch_checkpoint_path, latest_checkpoint_path)
-                    self.logger.debug(f"创建了硬链接从 {epoch_checkpoint_path} 到 {latest_checkpoint_path}")
-                except OSError as e:
-                    # 如果硬链接失败（例如，跨文件系统或其他限制），则直接复制文件
-                    self.logger.warning(f"创建硬链接失败，将直接复制文件: {e}")
-                    save_checkpoint(
-                        self.model,
-                        latest_checkpoint_path,
-                        optimizer=self.optimizer,
-                        scheduler=self.scheduler,
-                        epoch=self.current_epoch,
-                        metrics=metrics
-                    )
-                
-                # 只有当显式设置了keep_num时才清理旧的检查点文件
-                if keep_num is not None:
-                    self.logger.info(f"根据配置的keep_num={keep_num}清理旧检查点")
-                    self._cleanup_old_checkpoints(keep_num)
+            
+            # 只有当显式设置了keep_num时才清理旧的检查点文件
+            if keep_num is not None:
+                self.logger.info(f"根据配置的keep_num={keep_num}清理旧检查点")
+                self._cleanup_old_checkpoints(keep_num)
 
-            elif not os.path.exists(latest_checkpoint_path):
+            if not os.path.exists(latest_checkpoint_path):
                 # 如果没有保存周期性检查点，但最新检查点不存在，则创建一个
                 save_checkpoint(
                     self.model,
