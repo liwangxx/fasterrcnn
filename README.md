@@ -97,11 +97,24 @@ experiments/          # 实验结果文件夹
 
 ### 步骤
 
-1. 克隆仓库：
+1. Fork并克隆仓库：
 
 ```bash
-git clone https://github.com/cyicz123/dl_template
-cd dl_template
+# 1. 在GitHub上fork此仓库到你的账号下
+# 2. 将fork后的仓库重命名为你想要的名称（可选）
+# 3. 克隆你的仓库
+git clone https://github.com/你的用户名/你的仓库名.git
+cd 你的仓库名
+
+# 4. 设置原始仓库为upstream
+git remote add upstream https://github.com/cyicz123/dl_template.git
+
+# 5. 验证远程仓库设置
+git remote -v
+
+# 6. 当原始仓库有更新时，使用以下命令更新你的仓库
+git fetch upstream
+git rebase upstream/main
 ```
 
 2. 安装uv和同步依赖：
@@ -141,6 +154,7 @@ python tools/train.py --config configs/training/default.yaml --device cuda:0
 - [自定义损失函数教程](docs/losses.md) - 如何创建和注册自定义损失函数
 - [TensorBoard可视化](docs/tensorboard_visualization.md) - 如何使用TensorBoard进行可视化
 - [钩子系统使用指南](docs/hooks_usage.md) - 如何使用钩子系统扩展训练功能
+- [团队协作Git使用指南](docs/github-team-workflow.md) - 如何使用Git和Github进行标准化开发
 
 ## 许可证
 
