@@ -1,0 +1,14 @@
+dataset:
+  type: "voc2012"
+  data_root: "data/PASCAL_VOC"
+  year: "2012"
+  img_size: 600
+  use_fixed_size: true
+  use_augmentation: true
+  batch_size: 16
+  num_workers: 4
+  device: "cuda"
+  transforms:
+    normalize:
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225] 

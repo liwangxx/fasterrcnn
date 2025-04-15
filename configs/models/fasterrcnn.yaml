@@ -1,0 +1,26 @@
+model:
+  type: "fasterrcnn"
+  backbone: "resnet50"
+  num_classes: 21  # 20个类别 + 背景
+  pretrained: true
+  trainable_backbone_layers: 5  # 可训练的backbone层数
+  # RPN配置
+  rpn:
+    anchor_sizes: [32, 64, 128, 256, 512]
+    aspect_ratios: [0.5, 1.0, 2.0]
+    pre_nms_top_n_train: 2000
+    pre_nms_top_n_test: 1000
+    post_nms_top_n_train: 2000
+    post_nms_top_n_test: 1000
+    nms_thresh: 0.7
+    fg_iou_thresh: 0.7
+    bg_iou_thresh: 0.3
+  # ROI Heads配置
+  roi_heads:
+    fg_iou_thresh: 0.5
+    bg_iou_thresh: 0.5
+    batch_size_per_image: 512
+    positive_fraction: 0.25
+    score_thresh: 0.05
+    nms_thresh: 0.5
+    detections_per_img: 100 

@@ -1,0 +1,53 @@
+model_config: "configs/models/fasterrcnn.yaml"
+dataset_config: "configs/datasets/voc2012.yaml"
+
+seed: 42
+device: "cuda"
+
+# 损失函数配置已包含在FasterRCNN模型中
+
+training:
+  epochs: 30
+  optimizer:
+    type: "sgd"
+    lr: 0.005
+    momentum: 0.9
+    weight_decay: 1e-4
+  scheduler:
+    type: "step"
+    step_size: 10
+    gamma: 0.1
+  early_stopping:
+    patience: 5
+    min_delta: 0.001
+    monitor: "val_loss"
+    mode: "min"
+  checkpoint:
+    save_frequency: 1  # 每个epoch保存一次权重
+    keep_num: 3  # 保留最近的3个checkpoint
+
+# 评估配置
+evaluation:
+  frequency: 1  # 每个epoch评估一次
+  metrics: ["mAP"]  # 使用平均精度作为评估指标
+
+# 钩子配置
+hooks:
+  - type: "TimeTrackingHook"
+    name: "training_timer"
+    frequency: 1  # 每个epoch都要触发
+    
+  - type: "DetectionVisualizationHook"
+    name: "detection_visualizer"
+    frequency: 100  # 每100步可视化一次
+    num_images: 4  # 每次可视化4张图像
+    confidence_threshold: 0.5  # 显示置信度大于0.5的检测结果
+    
+  - type: "SystemMonitorHook"
+    name: "system_monitor"
+    frequency: 50  # 每50步更新一次可视化
+    interval: 2  # 数据采集间隔（秒）
+    track_cpu: true
+    track_memory: true
+    track_gpu: true
+    track_gpu_memory: true 
