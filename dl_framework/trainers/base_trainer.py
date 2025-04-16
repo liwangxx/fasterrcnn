@@ -523,12 +523,43 @@ class BaseTrainer:
             # 准备数据
             if isinstance(batch, dict):
                 # 如果batch是字典，每个键对应一个张量
-                inputs = {k: v.to(self.device) for k, v in batch.items() if k != 'targets'}
-                targets = batch['targets'].to(self.device)
+                inputs = {k: v.to(self.device) if k != 'targets' and isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+                
+                # 对于targets，需要特殊处理，因为FasterRCNN使用的是目标列表
+                if 'targets' in batch:
+                    if isinstance(batch['targets'], torch.Tensor):
+                        # 如果targets是tensor，直接移到device
+                        targets = batch['targets'].to(self.device)
+                    elif isinstance(batch['targets'], list):
+                        # 如果targets是列表，对列表中的每个tensor移到device
+                        targets = batch['targets']
+                        for i, target in enumerate(targets):
+                            if isinstance(target, dict):
+                                # 如果target是字典，将字典中的tensor移到device
+                                targets[i] = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
+                                           for k, v in target.items()}
+                            elif isinstance(target, torch.Tensor):
+                                targets[i] = target.to(self.device)
+                    else:
+                        raise ValueError(f"不支持的targets格式: {type(batch['targets'])}")
+                else:
+                    targets = None
             elif isinstance(batch, (list, tuple)) and len(batch) == 2:
                 # 如果batch是元组或列表，假设是(inputs, targets)
                 inputs = batch[0].to(self.device)
-                targets = batch[1].to(self.device)
+                # 同样需要特殊处理targets
+                if isinstance(batch[1], torch.Tensor):
+                    targets = batch[1].to(self.device)
+                elif isinstance(batch[1], list):
+                    targets = batch[1]
+                    for i, target in enumerate(targets):
+                        if isinstance(target, dict):
+                            targets[i] = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
+                                       for k, v in target.items()}
+                        elif isinstance(target, torch.Tensor):
+                            targets[i] = target.to(self.device)
+                else:
+                    raise ValueError(f"不支持的targets格式: {type(batch[1])}")
             else:
                 raise ValueError(f"不支持的batch格式: {type(batch)}")
             
@@ -545,7 +576,21 @@ class BaseTrainer:
                 loss = self.model.get_loss(outputs, targets)
             
             # 反向传播
-            loss.backward()
+            if isinstance(loss, torch.Tensor):
+                # 如果loss是一个张量，直接反向传播
+                loss.backward()
+            elif isinstance(loss, dict):
+                # 如果loss是字典（如FasterRCNN返回的损失字典），计算总损失并反向传播
+                total_loss = sum(loss_value for loss_name, loss_value in loss.items() 
+                              if isinstance(loss_value, torch.Tensor) and loss_value.requires_grad)
+                total_loss.backward()
+                # 保存loss为损失字典中的总和，用于记录
+                loss_value = sum(loss_value.item() if isinstance(loss_value, torch.Tensor) else loss_value 
+                             for loss_value in loss.values())
+                loss = total_loss  # 更新loss变量，用于下方的输出
+            else:
+                raise ValueError(f"不支持的损失类型: {type(loss)}")
+            
             self.optimizer.step()
             
             # 更新全局步数
@@ -595,12 +640,43 @@ class BaseTrainer:
                 # 准备数据
                 if isinstance(batch, dict):
                     # 如果batch是字典，每个键对应一个张量
-                    inputs = {k: v.to(self.device) for k, v in batch.items() if k != 'targets'}
-                    targets = batch['targets'].to(self.device)
+                    inputs = {k: v.to(self.device) if k != 'targets' and isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+                    
+                    # 对于targets，需要特殊处理，因为FasterRCNN使用的是目标列表
+                    if 'targets' in batch:
+                        if isinstance(batch['targets'], torch.Tensor):
+                            # 如果targets是tensor，直接移到device
+                            targets = batch['targets'].to(self.device)
+                        elif isinstance(batch['targets'], list):
+                            # 如果targets是列表，对列表中的每个tensor移到device
+                            targets = batch['targets']
+                            for i, target in enumerate(targets):
+                                if isinstance(target, dict):
+                                    # 如果target是字典，将字典中的tensor移到device
+                                    targets[i] = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
+                                               for k, v in target.items()}
+                                elif isinstance(target, torch.Tensor):
+                                    targets[i] = target.to(self.device)
+                        else:
+                            raise ValueError(f"不支持的targets格式: {type(batch['targets'])}")
+                    else:
+                        targets = None
                 elif isinstance(batch, (list, tuple)) and len(batch) == 2:
                     # 如果batch是元组或列表，假设是(inputs, targets)
                     inputs = batch[0].to(self.device)
-                    targets = batch[1].to(self.device)
+                    # 同样需要特殊处理targets
+                    if isinstance(batch[1], torch.Tensor):
+                        targets = batch[1].to(self.device)
+                    elif isinstance(batch[1], list):
+                        targets = batch[1]
+                        for i, target in enumerate(targets):
+                            if isinstance(target, dict):
+                                targets[i] = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
+                                           for k, v in target.items()}
+                            elif isinstance(target, torch.Tensor):
+                                targets[i] = target.to(self.device)
+                    else:
+                        raise ValueError(f"不支持的targets格式: {type(batch[1])}")
                 else:
                     raise ValueError(f"不支持的batch格式: {type(batch)}")
                 
@@ -616,7 +692,15 @@ class BaseTrainer:
                     loss = self.model.get_loss(outputs, targets)
                 
                 # 累积损失
-                total_loss += loss.item()
+                if isinstance(loss, torch.Tensor):
+                    total_loss += loss.item()
+                elif isinstance(loss, dict):
+                    # 如果loss是字典，累加所有损失值
+                    loss_value = sum(loss_value.item() if isinstance(loss_value, torch.Tensor) else loss_value 
+                                 for loss_value in loss.values())
+                    total_loss += loss_value
+                else:
+                    raise ValueError(f"不支持的损失类型: {type(loss)}")
         
         # 计算平均损失
         avg_loss = total_loss / num_batches
